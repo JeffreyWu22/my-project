@@ -8,8 +8,7 @@ date: "2024-10-03"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-```{r setup, include=FALSE}
+```{r}
 #renu::snapshot()
 #renu::restore()
 #renu::hydrate()
@@ -22,22 +21,69 @@ knitr::opts_chunk$set(echo = TRUE)
 #pull: update local repo with commits pushed by others 
 ```
 
-## R Markdown
+## Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+The Global Health Expenditure Database (GHED) provides time series data from 2000-2022 which covers country-level spending in the world. Healthcare in the USA is notably more expensive than its counter-parts across the world. This dataset will allow us to examine how different countries allocate their funds towards different segments of healthcare. For example, we may be able to explore how much spending is being allocated towards injuries, for example.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(tidyverse)
+library(readxl)
 ```
 
-## Including Plots
+```{r}
+GHED_data <- read_excel("GHED_data.XLSX", sheet = 1)
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+# View the structure of the dataset
+str(GHED_data)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Let us do a little bit of data cleaning. Here we will check for missing values. Further, we will use the variable measuring the proportion of national spending on healthcare as our first variable to explore. 
+
+```{r}
+GHED_data_filtered <- GHED_data %>%
+  select(
+    country,
+    year,
+    income,
+    che_gdp,
+    che_pc_usd,
+    gdp_usd2021_pc,
+    region,
+    oop_pc_usd
+  ) %>%
+  filter(year == 2021)
+
+missing_values <- colSums(is.na(GHED_data_filtered))
+missing_values
+```
+
+Let us find some summary statistics for che_gdp, the proportion of health spending on the basis of GDP.
+
+```{r}
+# Calculate summary statistics for 'che_gdp'
+summary_stats_che_gdp <- GHED_data_filtered %>%
+  select(che_gdp) %>%
+  drop_na() %>%
+  summarize(
+    mean = mean(che_gdp),
+    median = median(che_gdp),
+    sd = sd(che_gdp)
+  )
+summary_stats_che_gdp
+
+```
+
+The histogram will show how frequently different values of CHE as a percentage of GDP appear in the dataset for 2022.
+
+```{r}
+# Histogram of 'che_gdp'
+ggplot(GHED_data_filtered %>% select(che_gdp) %>% drop_na(), aes(x = che_gdp)) +
+  geom_histogram(binwidth = 1, fill = 'skyblue', color = 'black') +
+  labs(
+    title = 'Distribution of Current Health Expenditure as % of GDP in 2022',
+    x = 'CHE (% of GDP)',
+    y = 'Frequency'
+  )
+```
+
+
