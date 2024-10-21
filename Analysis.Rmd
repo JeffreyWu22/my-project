@@ -1,29 +1,18 @@
 ---
-title: "Analysis.Rmd"
+title: "Analyzing Global Healthcare Financing, Preventative Care, and Infectious Disease Costs"
 output: html_document
-date: "2024-10-03"
+date: "2024-10-21"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-#renu::snapshot()
-#renu::restore()
-#renu::hydrate()
-#git: different versions of a file
-#github: hosting "remotes"
-#clone: local copy of remote, remote is "origin"
-#fork: copy repo on git 
-#commit: creating a snapshot of changes 
-#push: update remote repo with local changes 
-#pull: update local repo with commits pushed by others 
-```
-
 ## Introduction
 
 The Global Health Expenditure Database (GHED) provides time series data from 2000-2022 which covers country-level spending in the world. Healthcare in the USA is notably more expensive than its counter-parts across the world. This dataset will allow us to examine how different countries allocate their funds towards different segments of healthcare. For example, we may be able to explore how much spending is being allocated towards injuries, for example.
+
+To explore the given dataset, we will look at three subsets in attempts to uncover interesting potential leads. The motivation behind this stems from the large presence of missing values that are in the dataset. We will demonstrate this below. Furthermore, variable names are not intuitive. Creating more meaningful subsets of the larger dataset will allow us to explore potentially interesting questions.
 
 ```{r}
 library(tidyverse)
@@ -37,53 +26,667 @@ GHED_data <- read_excel("GHED_data.XLSX", sheet = 1)
 str(GHED_data)
 ```
 
-Let us do a little bit of data cleaning. Here we will check for missing values. Further, we will use the variable measuring the proportion of national spending on healthcare as our first variable to explore. 
+We can notice that the size of the datasset is 4,224 x 3,923, representing a large number of both observations and variables. The dataset does not provide much value as it is. Additionally, we can begin to see the missing value problem that was previously mentioned.
 
 ```{r}
 GHED_data_filtered <- GHED_data %>%
-  select(
-    country,
-    year,
-    income,
-    che_gdp,
-    che_pc_usd,
-    gdp_usd2021_pc,
-    region,
-    oop_pc_usd
-  ) %>%
   filter(year == 2021)
 
-missing_values <- colSums(is.na(GHED_data_filtered))
-missing_values
+len <- length(GHED_data)
+
+missing_values <- as.data.frame(colSums(is.na(GHED_data_filtered)))
+colnames(missing_values) <- "n"
+missing_values$n <- missing_values$n / len
+
+ggplot(missing_values, aes(x = n)) +
+  geom_histogram() +
+  labs(title = "Proportion of Missing Values in 2021", x = "proportion")
+
 ```
 
-Let us find some summary statistics for che_gdp, the proportion of health spending on the basis of GDP.
+In just one year, the proportion of rows that have missing values vary greatly, ranging from 0% - 5%. From here on, we will begin to explore subsets of the data. The following three ideas will be investigated.
+
+(1) Vaccines are known to reduce the incidence rate of infectious diseases. Thus, we want to investigate if higher spending on vaccines reduces the amount countries need to spend on infectious disease treatment. We will use the following variables:
+
+- country: Country name
+- region: Region (WHO)
+- year: year
+- che_gdp: Current Health Expenditure (CHE) as % Gross Domestic Product (GDP)
+- che_pc_usd: Current Health Expenditure (CHE) per Capita in US$
+- fp3214_che: Expenditure on Vaccines as % Current Health Expenditure (CHE)
+- fp3214_gghed_fp3214: Domestic General Government Expenditure on Vaccines as % of expenditure on Vaccines
+- fp3214_ext_fp3214: External sources of funding on Vaccines as % of expenditure on Vaccines
+- dis1_che: Expenditure on Infectious and Parasitic Diseases as % of Current Health Expenditure (CHE)
+- dis11_che: Expenditure on HIV/AIDS and Sexually Transmitted Diseases (STDs) as % of Current Health Expenditure (CHE)
+- dis12_che: Expenditure on Tuberculosis (TB) as % of Current Health Expenditure (CHE)
+
+(2) Preventative services are often important in reducing long-term health costs and improving population health. Therefore it is crucial to examine how do healthcare financing, specifically out-of-pocket (OOPS) payments and government healthcare spending (GGHE-D), influence access to  healthcare services, including preventative care, across different income groups and regions. Understanding the financial barriers across different income groups and regions can provide valuable insights for policymakers seeking to improve health equity and design more effective healthcare systems.
+
+
+- **country**: Country name.
+- **region**: Region (WHO)
+- **income**: Country income group 2021 (World Bank)
+- **year**: Year
+- **che_gdp**: Current Health Expenditure (CHE) as % Gross Domestic Product (GDP)
+- **che_pc_usd**: Current Health Expenditreu (CHE) per Capita in US$
+- **gghed_che**: Domestic General Government Health Expenditure (GGHE-D) as % Current Health Expenditure (CHE)
+- **oops_che**: Out of pocket (OOPS) as % of Current Helath Expenditure (CHE)
+
+
+(3) Healthcare in America is marked by large out of pocket (OOP) costs. At the same time, it seems that we pay more in premiums than ever. Thus, it may be interesting to investigate how healthcare expenses change as the amount of government intervention increases. For example, do countries that have more government contribution allocate their funds differently? We will use the following variables to lay the groundwork to answer this question:
+
+- **country**: Country name
+- **region**: Region (WHO)
+- **year**: Year
+- **income**: Country income group 2021 (World Bank)
+- **che_gdp**: Current Health Expenditure (CHE) as % Gross Domestic Product (GDP)
+- **gdp_pc_usd**: Gross Domestic Product (GDP) per Capita in US$
+- **phc_che**: Primary Health Care (PHC) Expenditure as % Current Health Expenditure (CHE)
+- **hf**: Current health expenditure by financing schemes, in million current NCU
+  - **hf1**: Government schemes and compulsory contributory health care financing schemes
+    - **hf11**: Government schemes
+    - **hf12**: Compulsory contributory health insurance schemes
+      - **hf121**: Social health insurance schemes
+      - **hf122**: Compulsory private insurance schemes
+      - **hf12nec**: Unspecified compulsory contributory health insurance schemes (n.e.c.)
+    - **hf13**: Compulsory Medical Saving Accounts (CMSA)
+    - **hf1nec**: Unspecified government schemes and compulsory contributory schemes (n.e.c.)
+  - **hf2**: Voluntary health care payment schemes
+    - **hf21**: Voluntary health insurance schemes
+    - **hf22**: NPISH (Non-Profit Institutions Serving Households) financing schemes, including development agencies
+    - **hf23**: Enterprise financing schemes
+    - **hf2nec**: Unspecified voluntary health care payment schemes (n.e.c.)
+  - **hf3**: Household out-of-pocket payments (OOPS)
+  - **hf4**: Rest of the world financing schemes (non-resident)
+  
+## Section 1: Disease Specific Spending
+
+To begin this section, we will subset a section of data to use, as well as renaming certain variables to make it more readable and understandable to the viewers. This section is to look into how each countries have spent on specific disease as a percentage of their total health expenditure.
+
+In this section we will take a look at:
+- Infectious and Parasitic Diseases
+- HIV/Aids and Sexually transmitted diseases
+- Tuberculosis
+- Malaria
+- Neglected Tropical Diseases
+- Reproductive Health
+- Maternal Conditions
+- Perinatal Conditions
+- Contraceptive Management
+- Nutritional Deficiencies
+- Injuries
+- Other unspecified diseases/conditions
+
+For this subset we will choose the year of 2019 as the baseline as it represents the most recent snapshot of pre-COVID medical expenses
 
 ```{r}
-# Calculate summary statistics for 'che_gdp'
-summary_stats_che_gdp <- GHED_data_filtered %>%
-  select(che_gdp) %>%
-  drop_na() %>%
-  summarize(
-    mean = mean(che_gdp),
-    median = median(che_gdp),
-    sd = sd(che_gdp)
+disease_dataset <- GHED_data %>%
+  rename(
+    infectious = dis1_che,
+    hiv_aids = dis11_che,
+    tuberculosis = dis12_che,
+    malaria = dis13_che,
+    neg_tropical = dis16_che,
+    reproductive = dis2_che,
+    maternal = dis21_che,
+    perinatal = dis22_che,
+    contraceptive = dis23_che,
+    nutrition = dis3_che,
+    noncomm = dis4_che,
+    injuries = dis5_che,
+    other = disnec_che
+  ) %>%
+  select(
+    country,
+    region,
+    year,
+    hiv_aids,
+    tuberculosis,
+    malaria,
+    neg_tropical,
+    reproductive,
+    maternal,
+    perinatal,
+    contraceptive,
+    nutrition,
+    injuries,
+    other
   )
-summary_stats_che_gdp
-
+  head(disease_dataset)
 ```
-
-The histogram will show how frequently different values of CHE as a percentage of GDP appear in the dataset for 2022.
+Looking through the current subset, it seems that there are areas that are missing information or may contain rows that only have limited information. In order to be able to provide a detailed analysis for this section we will need to clean the dataset.
+We will first take a look at the overall structure of the dataset.
 
 ```{r}
-# Histogram of 'che_gdp'
-ggplot(GHED_data_filtered %>% select(che_gdp) %>% drop_na(), aes(x = che_gdp)) +
-  geom_histogram(binwidth = 1, fill = 'skyblue', color = 'black') +
+str(disease_dataset)
+```
+Looking through this, we will need to filter out years that we do not need for this section, so to filter through to only 2019 data.
+
+```{r}
+disease_filtered <- subset(disease_dataset, year %in% c(2019))
+str(disease_filtered)
+```
+
+However, in this subset, there contains rows where there are only few amounts of data, and a few that are missing only a certain amount of data. For this, we will create a quick function to look through the specific columns listec below to check for the ones that we want to keep. We will keep the rows that contain less missing values than actual values that are in the row.
+
+```{r}
+columns_to_check <- c("hiv_aids", "tuberculosis", "malaria", "neg_tropical", "reproductive", "maternal", "perinatal", "contraceptive", "nutrition", "injuries", "other")
+clean_disease <- disease_filtered[rowSums(is.na(disease_filtered[columns_to_check])) < length(columns_to_check), ]
+```
+
+Now we want to take a look at the region specific data. We want to know which regions are most prominent in this subset now. From what we can see of this dataset, the most prominent region is the Africa region.
+
+This dataset was collected by the World Health Organization, it has more data available for the Africa region, since they have numerous health initiatives as Africa faces a significant burden of communicable diseases, leading to more focus and more data collection to understand the underlying issues faced by those in the region. 
+
+However, the amount of data collected by other regions may be too low, in comparison, which could lead to other questions such as there is a signifcant lack of data for these areas specifically? Could it be a logistics issue or perhaps the government not willing to share the specific datasets.
+
+```{r}
+region_counts_df <- clean_disease %>%
+  group_by(region) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  filter(!is.na(region))
+print(region_counts_df)
+```
+### Plotting Region Specific Stacked Bar Charts
+
+```{r}
+# Stacked Bar Chart of AFR Region
+ggplot(clean_disease %>% filter(region == "AFR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (AFR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +  # Place legend at the bottom
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+
+In the Africa region it seems that the highest spending is on malaria, this can be explained by the mosquitos of that region having a longer life-span in comparison to those of other regions. Even though it is a disease that can be treated with care, in a region where it is hard to do so, prevents Malaria from being easily treated.
+
+```{r}
+# Stacked Bar Chart of AMR Region
+ggplot(clean_disease %>% filter(region == "AMR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (AMR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+In the Americas, there is a huge lack of data in this area, which can be explained by the WHO keeping the United States data seperate from the data making it hard to analyze both at the same time. However the lack of data in the South of the Americas is suprising which could stem from logistics issues or other limiting factors.
+
+```{r}
+# Stacked Bar Chart of EMR Region
+ggplot(clean_disease %>% filter(region == "EMR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (EMR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+For the EMR region it faces the same issue as the Americas, where there is a suprising lack of information. This could be stemmed to logistics issue where there are conflicts in countries inside the region such as Syria, Yemen, and Afghanistan. This could lead to medical issues in that region as well as not much access to treatment, making it hard for the people in those regions to report the data.
+
+```{r}
+# Stacked Bar Chart of EUR Region
+ggplot(clean_disease %>% filter(region == "EUR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (EUR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+For the EUR region there is more readibly avaiable information elsewhere, perhaps from the Eurpoean Union, which may lead to less reporting to the WHO. As well as having a good healthcare system, leading to few reports about some of the issues that other regions may face.
+
+```{r}
+# Stacked Bar Chart of SEAR Region
+ggplot(clean_disease %>% filter(region == "SEAR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (SEAR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+In the South East Asian Region, this could stem from health system imitations: Many countries in SEAR have under-resourced health systems with limited capacity for comprehensive data collection. This can lead to inconsistent or incomplete reporting of health metrics, especially in rural or underserved areas. As well as, a high disease burden: The region experiences a high burden of infectious diseases (e.g., tuberculosis, dengue, malaria) and non-communicable diseases (e.g., diabetes, cardiovascular diseases). The focus on addressing immediate health challenges can deprioritize routine data collection efforts, affecting data quality.
+
+```{r}
+# Stacked Bar Chart of WPR Region
+ggplot(clean_disease %>% filter(region == "WPR") %>%
+         pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
+                                neg_tropical, reproductive, maternal,
+                                perinatal, contraceptive, nutrition,
+                                injuries, other),
+                      names_to = "Metric",
+                      values_to = "Percentage"),
+       aes(x = country, y = Percentage, fill = Metric)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Percentage of Health Metrics by Country (WPR Region)",
+       x = "Country",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+The WPR region could face issues from a digital divide, some people may have  limited access to digital health technologies, resulting in a digital divide that can impact data collection quality and timeliness.
+
+## Section 2: Out-of-pocket (OOPS) and government healthcare spending (GGHE-D) influence ob healthcare outcomes across income groups and regions
+
+Selecting the revelant columns from the data set for the analysis and removing missing values in these columns
+
+```{r}
+data <- GHED_data
+
+subset_data <- data %>%
+  select(region, income, year, gghed_che, oops_che, che_gdp, che_pc_usd) %>%
+  filter(!is.na(gghed_che) & !is.na(oops_che) & !is.na(che_gdp) & !is.na(che_pc_usd))
+```
+
+We group the data by region and income to calculate the mean values of government health expenditure (gghed_che), out-of-pocket expenditure (oops_che), and overall health expenditure (che_gdp and che_pc_usd). This helps us summarize the key variables by region and income level.
+
+```{r}
+summary_stats <- subset_data %>%
+  group_by(region, income) %>%
+  summarise(
+    mean_gghed_che = mean(gghed_che, na.rm = TRUE),
+    mean_oops_che = mean(oops_che, na.rm = TRUE),
+    mean_che_gdp = mean(che_gdp, na.rm = TRUE),
+    mean_che_pc_usd = mean(che_pc_usd, na.rm = TRUE)
+  )
+
+# Print the summary stats
+print(summary_stats)
+```
+We calculate correlations between:
+
+- Government expenditure (GGHE-D) and out-of-pocket expenditure (OOPS).
+- Government expenditure (GGHE-D) and health expenditure as % of GDP (CHE-GDP).
+- Out-of-pocket expenditure (OOPS) and health expenditure as % of GDP (CHE-GDP).
+
+This step helps to see how government spending or individual costs relate to overall health expenditure.
+
+There is a negative correlation of -0.738 between government expenditure and out-of-pocket expenditure, which suggests that in countries where the government spends more on healthcare, individuals are required to pay less out-of-pocket for medical services and treatments. Essentially, greater government funding reduces the financial burden on citizens.
+
+There is a positive correlation of 0.229 between government expenditure and health expenditure as % of GDP, which suggests the more the government contributes to healthcare, the more the country as a whole tends to spend on health relative to the size of its economy.
+
+There is a negative correlation of -0.351 between out of pocket expenditure and health expenditure as % of GDP suggests that countries or regions with higher health expenditure as a percentage of GDP are likely to have lower out-of-pocket spending by individuals.
+
+```{r}
+correlation_analysis <- subset_data %>%
+  summarise(
+    correlation_gghed_oops = cor(gghed_che, oops_che, use = "complete.obs"),
+    correlation_gghed_che_gdp = cor(gghed_che, che_gdp, use = "complete.obs"),
+    correlation_oops_che_gdp = cor(oops_che, che_gdp, use = "complete.obs")
+  )
+
+# Print the correlation analysis
+print(correlation_analysis)
+```
+The scatter plot explores the relationship between government expenditure and out-of-pocket costs across income groups. A linear trend line is added to assess the general trend. Here it shows that government expenditure on health is higher in high income region than low income region, and vice versa.
+
+```{r}
+ggplot(subset_data, aes(x = gghed_che, y = oops_che, color = income)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
   labs(
-    title = 'Distribution of Current Health Expenditure as % of GDP in 2022',
-    x = 'CHE (% of GDP)',
+    title = "Relationship between Government Expenditure and Out-of-Pocket Expenditure",
+    x = "Government Expenditure on Health (% of Current Health Expenditure)",
+    y = "Out-of-Pocket Expenditure (% of Current Health Expenditure)",
+    color = "Income Level"
+  ) +
+  theme_minimal()
+```
+The bar chart shows average health expenditure per capita by income level and region, providing a clear comparison of spending levels. The drastic difference in average health expenditure per capita between high income level region and all other three regions shows a concerning reality of how wealth plays into an effect on health resource allocation.
+
+```{r}
+ggplot(summary_stats, aes(x = income, y = mean_che_pc_usd, fill = region)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Average Health Expenditure per Capita by Income Level and Region",
+    x = "Income Level",
+    y = "Average Health Expenditure per Capita (USD)",
+    fill = "Region"
+  ) +
+  theme_minimal()
+```
+
+The line chart tracks government health expenditure as a % of current health expenditure over time by income level, allowing us to see trends across different income groups from 2000-2020.
+
+Unsurprinsgly, the high income regions are consistenly high on their expenditure on health at around 80% of CHE. Upper middle regions are experiencing a decrease in expenditure since 2020 and has since fallen to the same expenditure level as the lower middle regions in 2022. The low income regions are struggling to stay above their expenditure level at around 20% of CHE.
+
+These dynamics highlight the need for targeted policies to enhance healthcare financing and infrastructure, particularly in lower-income regions, to ensure equitable access to health services and improve overall health outcomes.
+
+```{r}
+ggplot(subset_data, aes(x = year, y = gghed_che, color = income)) +
+  geom_line(stat = "summary", fun = "mean") +
+  labs(
+    title = "Trend of Government Health Expenditure (% of CHE) by Income Group (2000-2020)",
+    x = "Year",
+    y = "Government Expenditure on Health (% of Current Health Expenditure)",
+    color = "Income Group"
+  ) +
+  theme_minimal()
+```
+
+The box plot identify detect outliers in out-of-pocket and government health expenditures across income levels and regions. This can help identify patterns and variances that warrant further investigation.
+
+Out of pocket expenditure distributed by income level and region box plot shows that there are a few outliers in EUR and WPR region for the high income level and EMR region for upper middle income level.
+
+```{r}
+ggplot(subset_data, aes(x = income, y = oops_che, fill = region)) +
+  geom_boxplot() +
+  labs(
+    title = "Out-of-Pocket Expenditure Distribution by Income Level and Region",
+    x = "Income Level",
+    y = "Out-of-Pocket Expenditure (% of Current Health Expenditure)"
+  ) +
+  theme_minimal()
+```
+Government health expenditure distribution by income level and region box plot shows there are outliers across all four income level. There are outliers in EUR region for high income level; outliers in AFR region for low income level; outliers in AMR region lower middle income level; outliers in AFR region and WPR region for upper middle income level.
+
+```{r}
+ggplot(subset_data, aes(x = income, y = gghed_che, fill = region)) +
+  geom_boxplot() +
+  labs(
+    title = "Government Health Expenditure Distribution by Income Level and Region",
+    x = "Income Level",
+    y = "Government Health Expenditure (% of Current Health Expenditure)"
+  ) +
+  theme_minimal()
+```
+
+The outliers shows that that they are potentially skewing results or indicating areas requiring targeted policy interventions. For example the outliers seen in high income level from both the boxplots suggests that there is still a need for regulations to investigate high income regions despite already having the the highest government health expenditure as well as the lowest out of pocket expenditure.
+
+## Section 3: Out of Pocket Costs & Insurance Contributions
+
+To begin analyzing the data, we will select a subset of variables and rename them in order to make downstream analysis easier. Displayed below is a subset of the new dataset which we will use to explore our question. The goal is to look at the proportion of OOP healthcare costs vs. social insurance contributions across different countries.
+
+The scope of this analysis will include all countries with valid data. We will begin with looking at all years, and eventually narrow down to 2019. We choose 2019 as a baseline as it represents the most recent snapshot of pre-COVID medical expenses.
+
+```{r}
+# Rename variables to have intuitive names
+OOP_subset <- GHED_data %>%
+  rename(
+    current_health_expenditure_pct_gdp = che_gdp,
+    gdp_per_capita_usd = gdp_pc_usd,
+    primary_health_care_expenditure_pct_che = phc_che,
+    total_expenditure = hf,
+    govt_and_compulsory_financing = hf1,
+    government_schemes = hf11,
+    compulsory_contributory_health_insurance = hf12,
+    social_health_insurance_schemes = hf121,
+    compulsory_private_insurance_schemes = hf122,
+    unspecified_compulsory_contributory_insurance = hf12nec,
+    compulsory_medical_savings_accounts = hf13,
+    unspecified_govt_compulsory_schemes = hf1nec,
+    voluntary_health_payment_schemes = hf2,
+    voluntary_health_insurance_schemes = hf21,
+    non_profit_institutions_serving_households = hf22,
+    enterprise_financing_schemes = hf23,
+    unspecified_voluntary_payment_schemes = hf2nec,
+    household_out_of_pocket_payments = hf3,
+    rest_of_world_financing_schemes = hf4
+  ) %>%
+  select(
+    country,
+    region,
+    year,
+    income,
+    total_expenditure,
+    current_health_expenditure_pct_gdp,
+    gdp_per_capita_usd,
+    primary_health_care_expenditure_pct_che,
+    govt_and_compulsory_financing,
+    government_schemes,
+    compulsory_contributory_health_insurance,
+    social_health_insurance_schemes,
+    compulsory_private_insurance_schemes,
+    unspecified_compulsory_contributory_insurance,
+    compulsory_medical_savings_accounts,
+    unspecified_govt_compulsory_schemes,
+    voluntary_health_payment_schemes,
+    voluntary_health_insurance_schemes,
+    non_profit_institutions_serving_households,
+    enterprise_financing_schemes,
+    unspecified_voluntary_payment_schemes,
+    household_out_of_pocket_payments,
+    rest_of_world_financing_schemes
+  )
+
+head(OOP_subset)
+```
+As it currently stands, the variables we have are not very informative. We will first transform them into percentages. We consider the total sending to be the sum of out of pocket payments, contribution from social insurance, compulsory prepayment, and voluntary prepayment. We will also do some minor pre-cleaning of the data.
+
+```{r}
+head(OOP_subset)
+
+# Calculate percentages of financing schemes relative to total health expenditure
+OOP_subset <- OOP_subset %>%
+  mutate(
+    pct_govt_intervention = (govt_and_compulsory_financing / total_expenditure) * 100,
+    pct_voluntary_protection = (voluntary_health_payment_schemes / total_expenditure) * 100,
+    pct_household_out_of_pocket = (household_out_of_pocket_payments / total_expenditure) * 100
+  )
+
+str(OOP_subset)
+```
+We want to ensure that there are no missing values in our primary variables. It appears from below that our data in fairly clean.
+
+```{r}
+# Remove rows with missing values in key variables
+OOP_subset <- OOP_subset %>%
+  filter(
+    !is.na(pct_govt_intervention) &
+    !is.na(pct_voluntary_protection) &
+    !is.na(pct_household_out_of_pocket)
+  )
+
+str(OOP_subset)
+```
+
+We will begin by exploring the basic distribution of our data.
+
+```{r}
+ggplot(OOP_subset, aes(x = pct_govt_intervention)) +
+  geom_histogram(binwidth = 5, fill = 'blue', color = 'black') +
+  labs(
+    title = 'Distribution of Government Based Schemes',
+    x = 'Percentage (%)',
+    y = 'Frequency'
+  )
+
+ggplot(OOP_subset, aes(x = pct_household_out_of_pocket)) +
+  geom_histogram(binwidth = 5, fill = 'red', color = 'black') +
+  labs(
+    title = 'Distribution of Household Out-of-Pocket Payments',
+    x = 'Percentage (%)',
+    y = 'Frequency'
+  )
+
+ggplot(OOP_subset, aes(x = pct_voluntary_protection)) +
+  geom_histogram(binwidth = 5, fill = 'green', color = 'black') +
+  labs(
+    title = 'Distribution of Voluntary Payments',
+    x = 'Percentage (%)',
     y = 'Frequency'
   )
 ```
 
+Now is a good time to explain what exactly each one of these variables really mean.
 
+Firstly, the distribution of government-based schemes shows how much of total healthcare spending is funded through the government. A high percentage here indicates that healthcare programs are more tax-funded as opposed to individually funded.
+
+Secondly, the distribution of out of pocket payments represents the total health care expenditure that is paid directly at the point of service. This means that premiums for insurance or the tax dollars that are paid are not included in this category.
+
+Finally, the distribution of voluntary payments shows the relative amount of health expenditures coming from sources that people opt into. The easiest example is supplemental health insurance where people can choose what plan they want.
+
+Now we will look into some descriptive statistics by year.
+
+```{r}
+# Calculate basic statistical metrics for the new variables grouped by year
+yearly_stats <- OOP_subset %>%
+  group_by(year) %>%
+  summarise(
+    mean_govt_intervention = mean(pct_govt_intervention, na.rm = TRUE),
+    median_govt_intervention = median(pct_govt_intervention, na.rm = TRUE),
+    sd_govt_intervention = sd(pct_govt_intervention, na.rm = TRUE),
+    mean_out_of_pocket = mean(pct_household_out_of_pocket, na.rm = TRUE),
+    median_out_of_pocket = median(pct_household_out_of_pocket, na.rm = TRUE),
+    sd_out_of_pocket = sd(pct_household_out_of_pocket, na.rm = TRUE),
+    mean_voluntary_protection = mean(pct_voluntary_protection, na.rm = TRUE),
+    median_voluntary_protection = median(pct_voluntary_protection, na.rm = TRUE),
+    sd_voluntary_protection = sd(pct_voluntary_protection, na.rm = TRUE)
+  )
+
+head(yearly_stats)
+```
+Looking at the sample size for each datapoint, we can see that there is a significant drop at the final time point. This final time point is 2022 with only 20 samples. Thus, we shall remove 2022 from downstream analysis.
+
+```{r}
+# Calculate the number of observations per year, removing rows with NAs
+obs_count_per_year <- OOP_subset %>%
+  group_by(year) %>%
+  summarise(observation_count = n())
+
+# Plot the number of observations over time
+ggplot(obs_count_per_year, aes(x = year, y = observation_count)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red", size = 2) +
+  labs(
+    title = "Number of Observations Over Time",
+    x = "Year",
+    y = "Number of Observations"
+  )
+```
+Utilizing these yearly aggregated statistics, let us observe how the following have changed over time for each one of our variables:
+
+(1) How the median has changed over time. This will indicate relative trends for each of our variables.
+
+(2) How the coefficient of variation has changed over time. This will indicate if countries are either conforming to similar policies or if, instead, they are becoming more disparate.
+
+```{r}
+yearly_stats <- yearly_stats %>%
+  filter(year != 2022)
+
+ggplot(yearly_stats, aes(x = year)) +
+  geom_line(aes(y = median_govt_intervention, color = "Govt Intervention"), size = 1) +
+  geom_line(aes(y = median_out_of_pocket, color = "Out-of-Pocket"), size = 1) +
+  geom_line(aes(y = median_voluntary_protection, color = "Voluntary Protection"), size = 1) +
+  labs(
+    title = "Median of Health Financing Variables Over Time",
+    x = "Year",
+    y = "Median (%)",
+    color = "Variable"
+  )
+```
+
+```{r}
+yearly_stats$cv_govt_intervention <- yearly_stats$sd_govt_intervention / yearly_stats$mean_govt_intervention
+yearly_stats$cv_out_of_pocket <- yearly_stats$sd_out_of_pocket / yearly_stats$mean_out_of_pocket
+yearly_stats$cv_voluntary_protection <- yearly_stats$sd_voluntary_protection / yearly_stats$mean_voluntary_protection
+
+ggplot(yearly_stats, aes(x = year)) +
+  geom_line(aes(y = cv_govt_intervention, color = "Govt Intervention"), size = 1) +
+  geom_line(aes(y = cv_out_of_pocket, color = "Out-of-Pocket"), size = 1) +
+  geom_line(aes(y = cv_voluntary_protection, color = "Voluntary Protection"), size = 1) +
+  labs(
+    title = "Coefficient of Variation of Health Financing Variables Over Time",
+    x = "Year",
+    y = "Coefficient of Variation",
+    color = "Variable"
+  )
+```
+
+For the final portion of this analysis, we will look at the relationship between percent spending on government intervention and out of pocket costs. We will also investigate how voluntary protection can protect consumers.
+
+```{r}
+# Scatter plot of Social Health Insurance vs. Out-of-Pocket Payments
+ggplot(OOP_subset, aes(x = pct_govt_intervention, y = pct_household_out_of_pocket, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Out-of-Pocket Payments vs. Government Intervention',
+    x = 'Government Intervention (% of Total Health Expenditure)',
+    y = 'Out-of-Pocket Payments (% of Total Health Expenditure)'
+  )
+
+```
+
+```{r}
+# Scatter plot of Social Health Insurance vs. Out-of-Pocket Payments
+ggplot(OOP_subset, aes(x = pct_govt_intervention, y = pct_voluntary_protection, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Voluntary Protection Contribution vs. Government Intervention Contribution',
+    x = 'Government Intervention (% of Total Health Expenditure)',
+    y = 'Voluntary Protection Contribution (% of Total Health Expenditure)'
+  )
+
+```
+
+The analysis above has opened up potentially interesting question for further investigation. Trivally, we have shown that as the magnitude of government spending on healthcare decreases, the amount of out of pocket spending on the behalf of the individual increases. However, we notice that there are some poorer countries that are able to have less government support, but still have out of pocket costs that are comparable to those of higher income countries. Investigating why this is the case may prove fruitful. Furthermore, it seems that some low income countries are able to supplement low government intervention with voluntary protection plans. However, there are others that are unable to. Identifying what characteristics distinguish these two types of countries may also prove to be an interesting further line of inquiry.
+
+## Summary 
+Vaccine and specific healthcare spending data is hard to come across in this dataset. There are many missing values which makes it difficult to make meaningful comparisons. However, it is interesting to note that we are able to observe how different regions have different predominant diseases. 
+
+We then looked into how different country types allocate funds towards healthcare based on region and income level. There were stark differences and an abundance of data present. We were also able to observe outliers which means that there are likely other factors that influence how money is allocated towards healthcare.
+
+Finally, we looked specifically towards how insurance is utilized to offset out of pocket costs in countries with low government healthcare spending. Some low income countries are able to brace healthcare costs utilizing private insurance. However, others are unable to do so. Exploring why this is the case may also prove to be a fruitful line of inquiry. 
+
+
+Citations:
+
+World Health Organization (WHO). (2023). Global Health Expenditure Database. World Health Organization. Retrieved from https://apps.who.int/nha/database.
