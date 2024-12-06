@@ -14,6 +14,12 @@ The Global Health Expenditure Database (GHED) provides time series data from 200
 
 To explore the given dataset, we will look at three subsets in attempts to uncover interesting potential leads. The motivation behind this stems from the large presence of missing values that are in the dataset. We will demonstrate this below. Furthermore, variable names are not intuitive. Creating more meaningful subsets of the larger dataset will allow us to explore potentially interesting questions.
 
+### Purpose of the GHED Data
+
+Before delving into analysis, we will focus on the purpose of GHED data. The GHED data is designed to support policy development, comparative analysis, sustainable development goal monitoring, and for advocacy. For instance, the granular data that is available on a standardized world-wide scale, allows UN policy makers to allocate funds more appropriately. Furthermore, officials are able to identify how, for example, aid funds are being spent within a country. This is critical for ensuring that, especially in the future, funds are allocated in the most effective way possible. 
+
+We build upon these goals to monitor one specific indicator (OOP costs) in everyday life. However, data is comprised of reports from Ministries of Health, national statistical offices, and other government bodies. Thus, internal bias within the country may influence the data. Regardless, we need to look at how funds are being spent by the average person across different countries in order to improve overall quality of life. While we don't have costs broken down by household, we believe that OOP costs on the scale of a country serves as the best available proxy in our data for everyday expenses. 
+
 ```{r}
 library(tidyverse)
 library(readxl)
@@ -23,10 +29,11 @@ library(readxl)
 GHED_data <- read_excel("GHED_data.XLSX", sheet = 1)
 
 # View the structure of the dataset
-str(GHED_data)
+dim(GHED_data)
+head(GHED_data)
 ```
 
-We can notice that the size of the datasset is 4,224 x 3,923, representing a large number of both observations and variables. The dataset does not provide much value as it is. Additionally, we can begin to see the missing value problem that was previously mentioned.
+We can notice that the size of the datasset is 4,224 x 3,923, representing a large number of both observations and variables. The dataset does not provide much value as it is. Additionally, we can begin to see the missing value problem that was previously mentioned, particularly in columns 8-10. 
 
 ```{r}
 GHED_data_filtered <- GHED_data %>%
@@ -532,8 +539,6 @@ OOP_subset <- OOP_subset %>%
     !is.na(pct_voluntary_protection) &
     !is.na(pct_household_out_of_pocket)
   )
-
-str(OOP_subset)
 ```
 
 We will begin by exploring the basic distribution of our data.
@@ -677,16 +682,263 @@ ggplot(OOP_subset, aes(x = pct_govt_intervention, y = pct_voluntary_protection, 
 
 ```
 
-The analysis above has opened up potentially interesting question for further investigation. Trivally, we have shown that as the magnitude of government spending on healthcare decreases, the amount of out of pocket spending on the behalf of the individual increases. However, we notice that there are some poorer countries that are able to have less government support, but still have out of pocket costs that are comparable to those of higher income countries. Investigating why this is the case may prove fruitful. Furthermore, it seems that some low income countries are able to supplement low government intervention with voluntary protection plans. However, there are others that are unable to. Identifying what characteristics distinguish these two types of countries may also prove to be an interesting further line of inquiry.
+The analysis above has opened up potentially interesting question for further investigation. Trivially, we have shown that as the magnitude of government spending on healthcare decreases, the amount of out of pocket spending on the behalf of the individual increases. However, we notice that there are some poorer countries that are able to have less government support, but still have out of pocket costs that are comparable to those of higher income countries. Investigating why this is the case may prove fruitful. Furthermore, it seems that some low income countries are able to supplement low government intervention with voluntary protection plans. However, there are others that are unable to. Identifying what characteristics distinguish these two types of countries may also prove to be an interesting further line of inquiry.
 
-## Summary 
+## Investigation of Time Series Government Spending
+
+```{r}
+# Investigation of how government spending in the previous period impacts 
+
+# label minimum year
+labeler <- OOP_subset %>%
+  group_by(country) %>%
+  summarise(min(year))
+
+colnames(labeler) <- c("country", "year")
+
+labeler$first_year <- TRUE
+
+OOP_subset <- OOP_subset %>%
+  left_join(labeler, by = c("country", "year"))
+
+gdp_joiner <- GHED_data %>%
+  select(country, year, gdp)
+
+OOP_subset <- OOP_subset %>%
+  left_join(gdp_joiner, by = c("country", "year"))
+
+OOP_subset_sorted <- OOP_subset %>%
+  arrange(country, year)
+
+# lead since we want prev
+OOP_subset_sorted$prev_gov_int <- lead(OOP_subset_sorted$pct_govt_intervention)
+
+# compute change in gov int
+OOP_subset_sorted$gov_int_change <- OOP_subset_sorted$pct_govt_intervention - OOP_subset_sorted$prev_gov_int 
+
+OOP_subset_sorted$prev_oop <- lead(OOP_subset_sorted$household_out_of_pocket_payments)
+
+OOP_subset_sorted$change_oop <- OOP_subset_sorted$household_out_of_pocket_payments - OOP_subset_sorted$prev_oop
+
+OOP_subset_sorted$gdp_oop_ratio <- OOP_subset_sorted$household_out_of_pocket_payments / OOP_subset_sorted$gdp
+
+OOP_subset_sorted$gdp_oop_ratio_difference <- OOP_subset_sorted$change_oop / OOP_subset_sorted$gdp
+
+OOP_subset_sorted <- OOP_subset_sorted %>%
+  mutate(first_year = if_else(is.na(first_year), FALSE, first_year)) %>%
+  filter(!first_year)
+
+OOP_subset_sorted %>%
+  ggplot(aes(x = gov_int_change, y = gdp_oop_ratio_difference)) +
+  geom_point()
+
+# compute the following
+# P(OOP Decreases | Gov Int Increases)
+
+OOP_subset_sorted$pos_gov_change <- OOP_subset_sorted$gov_int_change > 0
+OOP_subset_sorted$pos_oop_change <- OOP_subset_sorted$gdp_oop_ratio_difference > 0 
+
+proportions <- OOP_subset_sorted %>%
+  mutate(pos_gov_change = gov_int_change > 0,
+         neg_oop_change = gdp_oop_ratio_difference < 0) %>%
+  group_by(pos_gov_change) %>%
+  summarize(
+    total = n(),
+    neg_oop_count = sum(neg_oop_change, na.rm = TRUE),
+    neg_oop_proportion = mean(neg_oop_change, na.rm = TRUE)
+  ) %>%
+  drop_na()
+
+contingency_table <- OOP_subset_sorted %>%
+  mutate(pos_gov_change = gov_int_change > 0,
+         neg_oop_change = gdp_oop_ratio_difference < 0) %>%
+  count(pos_gov_change, neg_oop_change) %>%
+  drop_na() %>%
+  tidyr::pivot_wider(names_from = neg_oop_change, values_from = n, values_fill = 0)
+
+chisq_test <- chisq.test(as.matrix(contingency_table[,-1]))
+
+OOP_subset_sorted %>%
+  ggplot(aes(x = pos_gov_change, y = gdp_oop_ratio_difference)) +
+  geom_point()
+```
+
+```{r}
+proportions_yr <- OOP_subset_sorted %>%
+  mutate(pos_gov_change = gov_int_change > 0,
+         neg_oop_change = gdp_oop_ratio_difference < 0) %>%
+  group_by(pos_gov_change, year) %>%
+  summarize(
+    total = n(),
+    neg_oop_count = sum(neg_oop_change, na.rm = TRUE),
+    neg_oop_proportion = mean(neg_oop_change, na.rm = TRUE)
+  ) %>%
+  drop_na()
+
+proportions_yr %>%
+  ggplot(aes(x = year, y = neg_oop_proportion, color = pos_gov_change)) +
+  geom_point() + labs(x = "Year", y = "Negative OOP Change Proportion", color = "Positive Change Gov Spending")
+```
+
+```{r}
+# Perform the regression analysis
+model <- lm(pct_household_out_of_pocket ~ pct_govt_intervention, data = OOP_subset)
+
+# Extract coefficients
+coeffs <- coef(model)
+intercept <- round(coeffs[1], 2)
+slope <- round(coeffs[2], 2)
+
+# Format the regression equation as a string
+regression_eq <- paste0("y = ", slope, "x + ", intercept)
+
+# Create the plot with annotation
+ggplot(OOP_subset, aes(x = pct_govt_intervention, y = pct_household_out_of_pocket, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Out-of-Pocket Payments vs. Government Intervention',
+    x = 'Government Intervention (% of Total Health Expenditure)',
+    y = 'Out-of-Pocket Payments (% of Total Health Expenditure)'
+  ) +
+  annotate("text", x = max(OOP_subset$pct_govt_intervention) - 10, 
+           y = max(OOP_subset$pct_household_out_of_pocket) - 10, 
+           label = regression_eq, 
+           color = "black", 
+           size = 5, 
+           hjust = 1)
+
+```
+```{r}
+# Perform the regression analysis
+model <- lm(pct_voluntary_protection ~ pct_govt_intervention, data = OOP_subset)
+
+# Extract coefficients
+coeffs <- coef(model)
+intercept <- round(coeffs[1], 2)
+slope <- round(coeffs[2], 2)
+
+# Format the regression equation as a string
+regression_eq <- paste0("y = ", slope, "x + ", intercept)
+
+# Create the plot with annotation
+ggplot(OOP_subset, aes(x = pct_govt_intervention, y = pct_voluntary_protection, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Voluntary Protection Contribution vs. Government Intervention Contribution',
+    x = 'Government Intervention (% of Total Health Expenditure)',
+    y = 'Voluntary Protection Contribution (% of Total Health Expenditure)'
+  ) +
+  annotate("text", x = max(OOP_subset$pct_govt_intervention) - 10, 
+           y = max(OOP_subset$pct_voluntary_protection) - 10, 
+           label = regression_eq, 
+           color = "black", 
+           size = 5, 
+           hjust = 1)
+
+```
+
+```{r}
+foreign_sources <- GHED_data %>%
+  select(country, year, fs7)
+
+OOP_subset <- OOP_subset %>%
+  left_join(foreign_sources, by = c("year", "country"))
+
+OOP_subset$ratio_outsourcing <- (OOP_subset$fs7 / OOP_subset$total_expenditure) * 100
+```
+
+```{r}
+OOP_subset_lowinc <- OOP_subset %>%
+  filter(income %in% c("Low", "Lower-middle")) %>%
+  filter(!is.na(ratio_outsourcing))
+
+# Perform the regression analysis
+model <- lm(pct_govt_intervention ~ ratio_outsourcing, data = OOP_subset_lowinc)
+
+# Extract coefficients
+coeffs <- coef(model)
+intercept <- round(coeffs[1], 2)
+slope <- round(coeffs[2], 2)
+
+# Format the regression equation as a string
+regression_eq <- paste0("y = ", slope, "x + ", intercept)
+
+# Create the plot with annotation
+ggplot(OOP_subset_lowinc, aes(x = ratio_outsourcing, y = pct_govt_intervention, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Percent Government Intervention vs. Magnitude of Outsourcing',
+    x = 'Outsourcing Magnitude (% of Total Health Expenditure)',
+    y = 'Government Intervention (% of Total Health Expenditure)'
+  ) +
+  annotate("text", x = max(OOP_subset_lowinc$ratio_outsourcing) - 10, 
+           y = max(OOP_subset_lowinc$pct_household_out_of_pocket) - 10, 
+           label = regression_eq, 
+           color = "black", 
+           size = 5, 
+           hjust = 1)
+```
+```{r}
+OOP_subset_lowinc <- OOP_subset %>%
+  filter(income %in% c("Low", "Lower-middle")) %>%
+  filter(!is.na(ratio_outsourcing))
+
+# Perform the regression analysis
+model <- lm(pct_household_out_of_pocket ~ ratio_outsourcing, data = OOP_subset_lowinc)
+
+# Extract coefficients
+coeffs <- coef(model)
+intercept <- round(coeffs[1], 2)
+slope <- round(coeffs[2], 2)
+
+# Format the regression equation as a string
+regression_eq <- paste0("y = ", slope, "x + ", intercept)
+
+# Create the plot with annotation
+ggplot(OOP_subset_lowinc, aes(x = ratio_outsourcing, y = pct_household_out_of_pocket, color = income)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'blue') +
+  labs(
+    title = 'Percentage of Household OOP Costs vs. Magnitude of Outsourcing',
+    x = 'Magnitude of Outsourcing (% of Total Health Expenditure)',
+    y = 'OOP Costs (% of Total Health Expenditure)'
+  ) +
+  annotate("text", x = max(OOP_subset_lowinc$ratio_outsourcing) - 10, 
+           y = max(OOP_subset_lowinc$pct_household_out_of_pocket) - 10, 
+           label = regression_eq, 
+           color = "black", 
+           size = 5, 
+           hjust = 1)
+```
+
+
+## Conclusion 
 Vaccine and specific healthcare spending data is hard to come across in this dataset. There are many missing values which makes it difficult to make meaningful comparisons. However, it is interesting to note that we are able to observe how different regions have different predominant diseases. 
 
 We then looked into how different country types allocate funds towards healthcare based on region and income level. There were stark differences and an abundance of data present. We were also able to observe outliers which means that there are likely other factors that influence how money is allocated towards healthcare.
 
-Finally, we looked specifically towards how insurance is utilized to offset out of pocket costs in countries with low government healthcare spending. Some low income countries are able to brace healthcare costs utilizing private insurance. However, others are unable to do so. Exploring why this is the case may also prove to be a fruitful line of inquiry. 
+We also looked specifically towards how insurance is utilized to offset out of pocket costs in countries with low government healthcare spending. Some low income countries are able to brace healthcare costs utilizing private insurance. However, others are unable to do so. Exploring why this is the case may also prove to be a fruitful line of inquiry. 
+
+There are also a few different questions that may be worthwhile to explore. A key question is why some low-income countries exhibit lower out-of-pocket costs despite minimal government spending. Investigating the roles of external funding, voluntary contributions, and cultural or policy factors could help identify replicable strategies for reducing financial burdens in other low-resource settings. This would require merging additional data with our current data. For example, categorizing policy changes would be important in trying to identify effective operating procedures when providing aid to countries. This would be an excellent candidate for future work. 
 
 
 Citations:
 
 World Health Organization (WHO). (2023). Global Health Expenditure Database. World Health Organization. Retrieved from https://apps.who.int/nha/database.
+
+Dieleman, J. L., & Hanlon, M. (2013). MEASURING THE DISPLACEMENT AND REPLACEMENT OF GOVERNMENT HEALTH EXPENDITURE. Health Economics, 23(2), 129–140. https://doi.org/10.1002/hec.3016
+
+Hartman, M., Martin, A. B., Washington, B., Catlin, A., & The National Health Expenditure Accounts Team. (2022). National health care spending in 2020: Growth driven by federal spending in response to the COVID-19 pandemic. Health Affairs, 41(1), 13–25. https://doi.org/10.1377/hlthaff.2021.01763
+
+Morrissey, O. (2015). Aid and government fiscal behavior: Assessing recent evidence. World Development, 69, 98–105. https://doi.org/10.1016/j.worlddev.2013.12.008
+
+Piatti-Fünfkirchen, M., Lindelow, M., & Yoo, K. (2018). What are governments spending on health in east and southern africa? Health Systems &amp; Reform, 4(4), 284–299. https://doi.org/10.1080/23288604.2018.1510287
+
+Adam Wagstaff, Patrick Eozenou, Marc Smitz, Out-of-Pocket Expenditures on Health: A Global Stocktake, The World Bank Research Observer, Volume 35, Issue 2, August 2020, Pages 123–157, https://doi.org/10.1093/wbro/lkz009
+
+Past, present, and future of global health financing: a review of development assistance, government, out-of-pocket, and other private spending on health for 195 countries, 1995–2050
+
+Chang, Angela Y. et al. The Lancet, Volume 393, Issue 10187, 2233 - 2260, https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(19)30841-4/fulltext
