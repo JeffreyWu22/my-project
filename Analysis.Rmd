@@ -161,44 +161,45 @@ disease_dataset <- GHED_data %>%
   )
   head(disease_dataset)
 ```
-Looking through the current subset, it seems that there are areas that are missing information or may contain rows that only have limited information. In order to be able to provide a detailed analysis for this section we will need to clean the dataset.
-We will first take a look at the overall structure of the dataset.
+When looking through the current subset, it seems that there are areas that are missing information or may contain rows that only have limited information. In order to be able to provide a detailed analysis for this section we will need to clean the dataset.
 
-```{r}
-str(disease_dataset)
-```
-Looking through this, we will need to filter out years that we do not need for this section, so to filter through to only 2019 data.
-
-```{r}
+```{r setup , include=FALSE}
 disease_filtered <- subset(disease_dataset, year %in% c(2019))
 str(disease_filtered)
 ```
 
-However, in this subset, there contains rows where there are only few amounts of data, and a few that are missing only a certain amount of data. For this, we will create a quick function to look through the specific columns listec below to check for the ones that we want to keep. We will keep the rows that contain less missing values than actual values that are in the row.
+However, in this subset, there contains rows where there are only few amounts of data, and a few that are missing only a certain amount of data. For this, we will create a quick function to look through the specific columns listed below to check for the ones that we want to keep. We will keep the rows that contain less missing values than actual values that are in the row.
 
-```{r}
+```{r setup, include=FALSE}
 columns_to_check <- c("hiv_aids", "tuberculosis", "malaria", "neg_tropical", "reproductive", "maternal", "perinatal", "contraceptive", "nutrition", "injuries", "other")
 clean_disease <- disease_filtered[rowSums(is.na(disease_filtered[columns_to_check])) < length(columns_to_check), ]
 ```
 
-Now we want to take a look at the region specific data. We want to know which regions are most prominent in this subset now. From what we can see of this dataset, the most prominent region is the Africa region.
-
-This dataset was collected by the World Health Organization, it has more data available for the Africa region, since they have numerous health initiatives as Africa faces a significant burden of communicable diseases, leading to more focus and more data collection to understand the underlying issues faced by those in the region. 
-
-However, the amount of data collected by other regions may be too low, in comparison, which could lead to other questions such as there is a signifcant lack of data for these areas specifically? Could it be a logistics issue or perhaps the government not willing to share the specific datasets.
-
-```{r}
+```{r setup , include=FALSE}
 region_counts_df <- clean_disease %>%
   group_by(region) %>%
   summarise(Count = n(), .groups = 'drop') %>%
   filter(!is.na(region))
 print(region_counts_df)
 ```
-### Plotting Region Specific Stacked Bar Charts
 
 ```{r}
+region_counts_df
+```
+
+After cleaning the data, we will then divide the countries into regions. This will allow us to get a better snapshot of the countries as there are too many countries to be able to observe clearly. 
+
+As well, different regions require different amounts of spending, in regions like Africa where malaria is more commons spread, the spending would be much higher in comparison to regions like Europe where malaria is not as prevalent leading to less spending for that particular disease.
+
+However, the amount of data collected by other regions is extremely low in comparison to the Africa region, this could point to a potential logistics issue or perhaps the government not willing to share information as freely. 
+
+As such, when looking at the graphs, we will separate the graphs by region, in order to have a better comparison for each region. Regions will differ on how much will be spent on different diseases as particular diseases may be more prevalent in some regions than most. 
+
+### Plotting the Region Specific Stacked Bar Charts
+
+```{r setup, include = FALSE}
 # Stacked Bar Chart of AFR Region
-ggplot(clean_disease %>% filter(region == "AFR") %>%
+AFR_Region <- ggplot(clean_disease %>% filter(region == "AFR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -217,11 +218,15 @@ ggplot(clean_disease %>% filter(region == "AFR") %>%
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
 
+```{r}
+AFR_Region
+```
+
 In the Africa region it seems that the highest spending is on malaria, this can be explained by the mosquitos of that region having a longer life-span in comparison to those of other regions. Even though it is a disease that can be treated with care, in a region where it is hard to do so, prevents Malaria from being easily treated.
 
-```{r}
+```{r setup, include = FALSE}
 # Stacked Bar Chart of AMR Region
-ggplot(clean_disease %>% filter(region == "AMR") %>%
+AMR_region <- ggplot(clean_disease %>% filter(region == "AMR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -239,11 +244,16 @@ ggplot(clean_disease %>% filter(region == "AMR") %>%
         legend.position = "bottom") +
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
-In the Americas, there is a huge lack of data in this area, which can be explained by the WHO keeping the United States data seperate from the data making it hard to analyze both at the same time. However the lack of data in the South of the Americas is suprising which could stem from logistics issues or other limiting factors.
 
 ```{r}
+AMR_region
+```
+
+In the Americas, there is a huge lack of data in this area, which can be explained by the WHO keeping the United States data seperate from the data making it hard to analyze both at the same time. However the lack of data in the South of the Americas is suprising which could stem from logistics issues or other limiting factors.
+
+```{r setup, include = FALSE}
 # Stacked Bar Chart of EMR Region
-ggplot(clean_disease %>% filter(region == "EMR") %>%
+EMR_region <- ggplot(clean_disease %>% filter(region == "EMR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -261,11 +271,16 @@ ggplot(clean_disease %>% filter(region == "EMR") %>%
         legend.position = "bottom") +
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
-For the EMR region it faces the same issue as the Americas, where there is a suprising lack of information. This could be stemmed to logistics issue where there are conflicts in countries inside the region such as Syria, Yemen, and Afghanistan. This could lead to medical issues in that region as well as not much access to treatment, making it hard for the people in those regions to report the data.
 
 ```{r}
+EMR_region
+```
+
+For the EMR region it faces the same issue as the Americas, where there is a suprising lack of information. This could be stemmed to logistics issue where there are conflicts in countries inside the region such as Syria, Yemen, and Afghanistan. This could lead to medical issues in that region as well as not much access to treatment, making it hard for the people in those regions to report the data.
+
+```{r setup, include = FALSE}
 # Stacked Bar Chart of EUR Region
-ggplot(clean_disease %>% filter(region == "EUR") %>%
+EUR_region <- ggplot(clean_disease %>% filter(region == "EUR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -283,11 +298,16 @@ ggplot(clean_disease %>% filter(region == "EUR") %>%
         legend.position = "bottom") +
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
-For the EUR region there is more readibly avaiable information elsewhere, perhaps from the Eurpoean Union, which may lead to less reporting to the WHO. As well as having a good healthcare system, leading to few reports about some of the issues that other regions may face.
 
 ```{r}
+EUR_region
+```
+
+For the EUR region there is more readily available information elsewhere, perhaps from the European Union, which may lead to less reporting to the WHO. As well as having a good healthcare system, leading to few reports about some of the issues that other regions may face.
+
+```{r setup, include = FALSE}
 # Stacked Bar Chart of SEAR Region
-ggplot(clean_disease %>% filter(region == "SEAR") %>%
+SEAR_region <- ggplot(clean_disease %>% filter(region == "SEAR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -305,11 +325,16 @@ ggplot(clean_disease %>% filter(region == "SEAR") %>%
         legend.position = "bottom") +
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
-In the South East Asian Region, this could stem from health system imitations: Many countries in SEAR have under-resourced health systems with limited capacity for comprehensive data collection. This can lead to inconsistent or incomplete reporting of health metrics, especially in rural or underserved areas. As well as, a high disease burden: The region experiences a high burden of infectious diseases (e.g., tuberculosis, dengue, malaria) and non-communicable diseases (e.g., diabetes, cardiovascular diseases). The focus on addressing immediate health challenges can deprioritize routine data collection efforts, affecting data quality.
 
 ```{r}
+SEAR_region
+```
+
+In the South East Asian Region, this could stem from health system imitations: Many countries in SEAR have under-resourced health systems with limited capacity for comprehensive data collection. This can lead to inconsistent or incomplete reporting of health metrics, especially in rural or underserved areas. As well as, a high disease burden: The region experiences a high burden of infectious diseases (e.g., tuberculosis, dengue, malaria) and non-communicable diseases (e.g., diabetes, cardiovascular diseases). The focus on addressing immediate health challenges can deprioritize routine data collection efforts, affecting data quality.
+
+```{r setup, include = FALSE}
 # Stacked Bar Chart of WPR Region
-ggplot(clean_disease %>% filter(region == "WPR") %>%
+WPR_region <- ggplot(clean_disease %>% filter(region == "WPR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
                                 neg_tropical, reproductive, maternal,
                                 perinatal, contraceptive, nutrition,
@@ -327,7 +352,20 @@ ggplot(clean_disease %>% filter(region == "WPR") %>%
         legend.position = "bottom") +
   scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
+
+```{r}
+WPR_region
+```
+
 The WPR region could face issues from a digital divide, some people may have  limited access to digital health technologies, resulting in a digital divide that can impact data collection quality and timeliness.
+
+### Conclusion
+
+Overall, with the lack of data in regions except for the Africa region, it is hard to know the specific disease spending across the regions. In future studies, having more data would lead to more conclusive analysis, as having a 1-2 countries for some regions cannot paint how disease spending is affected in that region as a whole. In the Africa region in particular we can see how spending on malaria is higher than others. The presence of only one or two countries representing some regions is insufficient to accurately depict how disease spending is distributed or influenced within those areas as a whole.
+
+The lack of data raises questions as well, efforts should be made to include more countries from underrepresented regions to enhance the data set's representatives. Collaborating with regional health agencies could help fill these gaps.
+
+With more comprehensive data and advanced methodologies, future analysis could offer a clearer understanding of global and regional disease spending patterns. 
 
 ## Section 2: Out-of-pocket (OOPS) and government healthcare spending (GGHE-D) influence ob healthcare outcomes across income groups and regions
 
