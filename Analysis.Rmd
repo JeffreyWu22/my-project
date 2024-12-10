@@ -1,7 +1,7 @@
 ---
 title: "Analyzing Global Healthcare Financing, Preventative Care, and Infectious Disease Costs"
 output: html_document
-date: "2024-10-21"
+date: "2024-12-10"
 ---
 
 ```{r setup, include=FALSE}
@@ -367,9 +367,11 @@ The lack of data raises questions as well, efforts should be made to include mor
 
 With more comprehensive data and advanced methodologies, future analysis could offer a clearer understanding of global and regional disease spending patterns. 
 
-## Section 2: Out-of-pocket (OOPS) and government healthcare spending (GGHE-D) influence ob healthcare outcomes across income groups and regions
+## Section 2: Out-of-pocket (OOPS) and government healthcare spending (GGHE-D) influence healthcare outcomes across income groups and regions
 
-Selecting the revelant columns from the data set for the analysis and removing missing values in these columns
+To better understand how healthcare financing varies across regions and income levels, we conducted a series of analytical steps aimed at uncovering relationships, identifying patterns, and highlighting areas for potential policy intervention. Our approach focuses on key indicators like government health expenditure, out-of-pocket (OOP) costs, and total health expenditure as a share of GDP. Here’s a breakdown of our methodology and key findings
+
+Selecting the relevant columns from the data set for the analysis and removing missing values in these columns. This step was essential in allowing for accurate comparisons across regions and income levels.
 
 ```{r}
 data <- GHED_data
@@ -379,7 +381,7 @@ subset_data <- data %>%
   filter(!is.na(gghed_che) & !is.na(oops_che) & !is.na(che_gdp) & !is.na(che_pc_usd))
 ```
 
-We group the data by region and income to calculate the mean values of government health expenditure (gghed_che), out-of-pocket expenditure (oops_che), and overall health expenditure (che_gdp and che_pc_usd). This helps us summarize the key variables by region and income level.
+We group the data by region and income to calculate the mean values of government health expenditure (gghed_che), out-of-pocket expenditure (oops_che), and overall health expenditure (che_gdp and che_pc_usd). This aggregation allowed for a clearer comparison of health financing across different economic and geographic contexts. By summarizing these variables, we aimed to highlight disparities in how healthcare is financed in high-income vs. low-income regions.
 
 ```{r}
 summary_stats <- subset_data %>%
@@ -406,7 +408,7 @@ There is a negative correlation of -0.738 between government expenditure and out
 
 There is a positive correlation of 0.229 between government expenditure and health expenditure as % of GDP, which suggests the more the government contributes to healthcare, the more the country as a whole tends to spend on health relative to the size of its economy.
 
-There is a negative correlation of -0.351 between out of pocket expenditure and health expenditure as % of GDP suggests that countries or regions with higher health expenditure as a percentage of GDP are likely to have lower out-of-pocket spending by individuals.
+There is a negative correlation of -0.351 between out-of-pocket expenditure and health expenditure as % of GDP suggests that countries or regions with higher health expenditure as a percentage of GDP are likely to have lower out-of-pocket spending by individuals.
 
 ```{r}
 correlation_analysis <- subset_data %>%
@@ -419,7 +421,9 @@ correlation_analysis <- subset_data %>%
 # Print the correlation analysis
 print(correlation_analysis)
 ```
-The scatter plot explores the relationship between government expenditure and out-of-pocket costs across income groups. A linear trend line is added to assess the general trend. Here it shows that government expenditure on health is higher in high income region than low income region, and vice versa.
+The scatter plot explores the relationship between government expenditure and out-of-pocket costs across income groups. A linear trend line is added to assess the general trend. 
+
+The analysis reveals that high-income regions have higher government healthcare expenditure and lower out-of-pocket costs compared to low-income regions, which exhibit the opposite trend. This reflects the disparity in healthcare financing structures and highlights the need for stronger public healthcare support in low-income areas
 
 ```{r}
 ggplot(subset_data, aes(x = gghed_che, y = oops_che, color = income)) +
@@ -433,7 +437,7 @@ ggplot(subset_data, aes(x = gghed_che, y = oops_che, color = income)) +
   ) +
   theme_minimal()
 ```
-The bar chart shows average health expenditure per capita by income level and region, providing a clear comparison of spending levels. The drastic difference in average health expenditure per capita between high income level region and all other three regions shows a concerning reality of how wealth plays into an effect on health resource allocation.
+The bar chart shows average health expenditure per capita by income level and region, providing a clear comparison of spending levels. The drastic difference in average health expenditure per capita between high-income level regions and all other three regions shows a concerning reality of how wealth plays into an effect on health resource allocation. This reinforces the need for more equitable allocation of health resources to bridge the gap in healthcare access between wealthier and poorer regions.
 
 ```{r}
 ggplot(summary_stats, aes(x = income, y = mean_che_pc_usd, fill = region)) +
@@ -449,9 +453,9 @@ ggplot(summary_stats, aes(x = income, y = mean_che_pc_usd, fill = region)) +
 
 The line chart tracks government health expenditure as a % of current health expenditure over time by income level, allowing us to see trends across different income groups from 2000-2020.
 
-Unsurprinsgly, the high income regions are consistenly high on their expenditure on health at around 80% of CHE. Upper middle regions are experiencing a decrease in expenditure since 2020 and has since fallen to the same expenditure level as the lower middle regions in 2022. The low income regions are struggling to stay above their expenditure level at around 20% of CHE.
+Unsurprisingly, the high-income regions are consistently high in their expenditure on health at around 80% of CHE. Upper-middle regions have experienced a decrease in expenditure since 2020 and have since fallen to the same expenditure level as the lower-middle regions in 2022. The low-income regions are struggling to stay above their expenditure level at around 20% of CHE.
 
-These dynamics highlight the need for targeted policies to enhance healthcare financing and infrastructure, particularly in lower-income regions, to ensure equitable access to health services and improve overall health outcomes.
+This trend highlights the growing need for targeted interventions to bolster government healthcare funding, especially in upper-middle- and low-income regions. Without greater public support, these regions may face increased reliance on out-of-pocket payments, worsening inequality.
 
 ```{r}
 ggplot(subset_data, aes(x = year, y = gghed_che, color = income)) +
@@ -465,9 +469,11 @@ ggplot(subset_data, aes(x = year, y = gghed_che, color = income)) +
   theme_minimal()
 ```
 
-The box plot identify detect outliers in out-of-pocket and government health expenditures across income levels and regions. This can help identify patterns and variances that warrant further investigation.
+The box plot identifies outliers in out-of-pocket and government health expenditures across income levels and regions. This can help identify patterns and variances that warrant further investigation.
 
-Out of pocket expenditure distributed by income level and region box plot shows that there are a few outliers in EUR and WPR region for the high income level and EMR region for upper middle income level.
+High-income regions: Outliers in the EUR and WPR regions suggest that even wealthy regions experience variability in OOP costs, underscoring the need to address areas of financial vulnerability.
+
+Upper-middle-income regions: Outliers in the EMR region signal that even within this income group, there are countries with disproportionately high OOP costs, which may indicate gaps in healthcare access or government support.
 
 ```{r}
 ggplot(subset_data, aes(x = income, y = oops_che, fill = region)) +
@@ -479,7 +485,18 @@ ggplot(subset_data, aes(x = income, y = oops_che, fill = region)) +
   ) +
   theme_minimal()
 ```
-Government health expenditure distribution by income level and region box plot shows there are outliers across all four income level. There are outliers in EUR region for high income level; outliers in AFR region for low income level; outliers in AMR region lower middle income level; outliers in AFR region and WPR region for upper middle income level.
+We used a box plot to visualize the distribution of government health expenditure (GGHE-D) by region and income level. This analysis helps identify regions that exhibit unusually high or low government spending.
+
+Key Insight:
+Outliers were found in all four income levels, with notable instances in:
+
+High-income regions: Outliers in the EUR region may warrant investigation, as they suggest variability in how public funds are being allocated.
+
+Low-income regions: Outliers in the AFR region highlight significant disparities within this group, suggesting uneven allocation of limited healthcare resources.
+
+Lower-middle-income regions: Outliers in the AMR region point to potential underfunding in some countries, which may affect the affordability of healthcare services.
+
+Upper-middle-income regions: Outliers in the AFR and WPR regions suggest the need for targeted funding policies to reduce disparities in healthcare financing.
 
 ```{r}
 ggplot(subset_data, aes(x = income, y = gghed_che, fill = region)) +
@@ -492,7 +509,14 @@ ggplot(subset_data, aes(x = income, y = gghed_che, fill = region)) +
   theme_minimal()
 ```
 
-The outliers shows that that they are potentially skewing results or indicating areas requiring targeted policy interventions. For example the outliers seen in high income level from both the boxplots suggests that there is still a need for regulations to investigate high income regions despite already having the the highest government health expenditure as well as the lowest out of pocket expenditure.
+The identification of outliers in both government and out-of-pocket expenditure reveals crucial areas for potential policy intervention. For instance:
+
+High-income regions: While these regions generally exhibit strong government healthcare support, the outliers in the EUR and WPR regions suggest areas where regulatory oversight is needed to investigate why OOP costs are still significant.
+Low- and middle-income regions: Outliers in these regions emphasize the need for external support and improved public healthcare funding to reduce OOP costs. Targeted interventions could ensure more equitable healthcare access and better financial protection for citizens.
+These findings highlight the critical role of public healthcare funding in reducing individual financial burdens and ensuring fair access to healthcare. Policymakers should focus on regions with extreme outliers, as these may reflect areas where targeted funding or policy reforms are urgently needed.
+
+### Conclusion
+The analysis of the GHED data sheds light on significant disparities in healthcare financing across regions and income levels. The relationships between government health expenditure, out-of-pocket costs, and total health expenditure reveal the protective role of public healthcare funding. Our visualizations—scatter plots, bar charts, line charts, and box plots—highlight critical insights and outliers, emphasizing the need for targeted policy interventions. The most pressing concern lies in lower-income regions, where insufficient public healthcare funding results in higher out-of-pocket costs for citizens. Future efforts should prioritize addressing these disparities to promote equitable access to healthcare and improve overall health outcomes.
 
 ## Section 3: Out of Pocket Costs & Insurance Contributions
 
