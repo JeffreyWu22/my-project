@@ -163,14 +163,14 @@ disease_dataset <- GHED_data %>%
 ```
 When looking through the current subset, it seems that there are areas that are missing information or may contain rows that only have limited information. In order to be able to provide a detailed analysis for this section we will need to clean the dataset.
 
-```{r setup , include=FALSE}
+```{r}
 disease_filtered <- subset(disease_dataset, year %in% c(2019))
 str(disease_filtered)
 ```
 
 However, in this subset, there contains rows where there are only few amounts of data, and a few that are missing only a certain amount of data. For this, we will create a quick function to look through the specific columns listed below to check for the ones that we want to keep. We will keep the rows that contain less missing values than actual values that are in the row.
 
-```{r setup, include=FALSE}
+```{r}
 columns_to_check <- c("hiv_aids", "tuberculosis", "malaria", "neg_tropical", "reproductive", "maternal", "perinatal", "contraceptive", "nutrition", "injuries", "other")
 clean_disease <- disease_filtered[rowSums(is.na(disease_filtered[columns_to_check])) < length(columns_to_check), ]
 ```
@@ -197,7 +197,7 @@ As such, when looking at the graphs, we will separate the graphs by region, in o
 
 ### Plotting the Region Specific Stacked Bar Charts
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of AFR Region
 AFR_Region <- ggplot(clean_disease %>% filter(region == "AFR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
@@ -224,7 +224,7 @@ AFR_Region
 
 In the Africa region it seems that the highest spending is on malaria, this can be explained by the mosquitos of that region having a longer life-span in comparison to those of other regions. Even though it is a disease that can be treated with care, in a region where it is hard to do so, prevents Malaria from being easily treated.
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of AMR Region
 AMR_region <- ggplot(clean_disease %>% filter(region == "AMR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
@@ -251,7 +251,7 @@ AMR_region
 
 In the Americas, there is a huge lack of data in this area, which can be explained by the WHO keeping the United States data seperate from the data making it hard to analyze both at the same time. However the lack of data in the South of the Americas is suprising which could stem from logistics issues or other limiting factors.
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of EMR Region
 EMR_region <- ggplot(clean_disease %>% filter(region == "EMR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
@@ -278,7 +278,7 @@ EMR_region
 
 For the EMR region it faces the same issue as the Americas, where there is a suprising lack of information. This could be stemmed to logistics issue where there are conflicts in countries inside the region such as Syria, Yemen, and Afghanistan. This could lead to medical issues in that region as well as not much access to treatment, making it hard for the people in those regions to report the data.
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of EUR Region
 EUR_region <- ggplot(clean_disease %>% filter(region == "EUR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
@@ -305,7 +305,7 @@ EUR_region
 
 For the EUR region there is more readily available information elsewhere, perhaps from the European Union, which may lead to less reporting to the WHO. As well as having a good healthcare system, leading to few reports about some of the issues that other regions may face.
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of SEAR Region
 SEAR_region <- ggplot(clean_disease %>% filter(region == "SEAR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
@@ -332,7 +332,7 @@ SEAR_region
 
 In the South East Asian Region, this could stem from health system imitations: Many countries in SEAR have under-resourced health systems with limited capacity for comprehensive data collection. This can lead to inconsistent or incomplete reporting of health metrics, especially in rural or underserved areas. As well as, a high disease burden: The region experiences a high burden of infectious diseases (e.g., tuberculosis, dengue, malaria) and non-communicable diseases (e.g., diabetes, cardiovascular diseases). The focus on addressing immediate health challenges can deprioritize routine data collection efforts, affecting data quality.
 
-```{r setup, include = FALSE}
+```{r}
 # Stacked Bar Chart of WPR Region
 WPR_region <- ggplot(clean_disease %>% filter(region == "WPR") %>%
          pivot_longer(cols = c(hiv_aids, tuberculosis, malaria,
